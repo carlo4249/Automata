@@ -1,11 +1,4 @@
 import os
-import sys
-
-# Check if we're in a build environment (no BOT_TOKEN)
-if not os.getenv("BOT_TOKEN"):
-    print("Build environment detected - skipping bot execution")
-    sys.exit(0)
-
 import discord
 from discord.ext import commands
 from discord.ui import Button, View
