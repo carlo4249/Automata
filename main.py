@@ -5,6 +5,10 @@ from discord.ui import Button, View
 from flask import Flask
 from threading import Thread
 import asyncio
+from dotenv import load_dotenv  # Added for .env support
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Bot setup
 intents = discord.Intents.default()
@@ -231,8 +235,8 @@ async def on_command_error(ctx, error):
 if __name__ == "__main__":
     keep_alive()  # Start the keep-alive server
     # Load token from environment variable
-    token = os.environ.get('DISCORD_BOT_TOKEN')
+    token = os.environ.get('BOT_TOKEN')
     if not token:
-        print("Error: DISCORD_BOT_TOKEN environment variable not set!")
+        print("Error: BOT_TOKEN environment variable not set!")
         exit(1)
     bot.run(token)
