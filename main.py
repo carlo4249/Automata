@@ -218,8 +218,3 @@ async def on_command_error(ctx, error):
         pass  # Ignore unknown commands
     else:
         print(f"An error occurred: {error}")
-
-# Run the bot
-if __name__ == "__main__":
-    keep_alive()
-    bot.run(os.environ['BOT_TOKEN'])
