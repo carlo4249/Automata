@@ -77,6 +77,8 @@ def keep_alive():
 async def on_ready():
     print(f'{bot.user} has connected to Discord!')
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Applications"))
+    # Add persistent view
+    bot.add_view(ApplicationView())
 
 @bot.event
 async def on_member_join(member):
@@ -96,7 +98,12 @@ async def on_member_remove(member):
     # Close application tickets when a user leaves
     for channel in member.guild.channels:
         if isinstance(channel, discord.TextChannel) and (channel.name.startswith(f"apply-{member.name}") or channel.name.startswith(f"apply-{member.display_name}")):
-            await channel.delete(reason="User left the server")
+            try:
+                await channel.delete(reason="User left the server")
+            except discord.NotFound:
+                pass  # Channel already deleted
+            except discord.Forbidden:
+                print(f"Missing permissions to delete channel: {channel.name}")
 
 # Application system
 class ApplicationView(View):
@@ -123,8 +130,8 @@ class ApplicationView(View):
             if role:
                 overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_messages=True)
         
-        # Create channel
-        channel_name = f"apply-{interaction.user.name}"[:100]  # Ensure channel name doesn't exceed limit
+        # Create channel with truncated name if needed
+        channel_name = f"apply-{interaction.user.name}"[:32]  # Discord channel name limit
         category = discord.utils.get(interaction.guild.categories, name="Applications")
         
         try:
@@ -136,6 +143,7 @@ class ApplicationView(View):
             )
         except discord.HTTPException as e:
             await interaction.response.send_message("Failed to create application channel. Please try again later.", ephemeral=True)
+            print(f"Error creating channel: {e}")
             return
         
         # Send application instructions
@@ -218,3 +226,13 @@ async def on_command_error(ctx, error):
         pass  # Ignore unknown commands
     else:
         print(f"An error occurred: {error}")
+
+# Start the bot
+if __name__ == "__main__":
+    keep_alive()  # Start the keep-alive server
+    # Load token from environment variable
+    token = os.environ.get('DISCORD_BOT_TOKEN')
+    if not token:
+        print("Error: DISCORD_BOT_TOKEN environment variable not set!")
+        exit(1)
+    bot.run(token)
