@@ -1,10 +1,10 @@
 import os
-import re
 import discord
 from discord.ext import commands
 from discord.ui import Button, View
 from flask import Flask
 from threading import Thread
+import asyncio
 
 # Bot setup
 intents = discord.Intents.default()
@@ -12,7 +12,7 @@ intents.members = True
 intents.message_content = True
 bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
-# Staff roles (replace with your actual role IDs)
+# Staff roles
 STAFF_ROLES = [
     1409997551385706587,  # Overlord/owner
     1409998319572226228,  # Warlord/co-owner
@@ -95,7 +95,7 @@ async def on_member_join(member):
 async def on_member_remove(member):
     # Close application tickets when a user leaves
     for channel in member.guild.channels:
-        if channel.name.startswith(f"apply-{member.name}") or channel.name.startswith(f"apply-{member.display_name}"):
+        if isinstance(channel, discord.TextChannel) and (channel.name.startswith(f"apply-{member.name}") or channel.name.startswith(f"apply-{member.display_name}")):
             await channel.delete(reason="User left the server")
 
 # Application system
@@ -107,7 +107,7 @@ class ApplicationView(View):
     async def apply_button(self, interaction: discord.Interaction, button: Button):
         # Check if user already has an application channel
         for channel in interaction.guild.channels:
-            if channel.name.startswith(f"apply-{interaction.user.name}") or channel.name.startswith(f"apply-{interaction.user.display_name}"):
+            if isinstance(channel, discord.TextChannel) and (channel.name.startswith(f"apply-{interaction.user.name}") or channel.name.startswith(f"apply-{interaction.user.display_name}")):
                 await interaction.response.send_message("You already have an open application ticket!", ephemeral=True)
                 return
         
@@ -124,14 +124,19 @@ class ApplicationView(View):
                 overwrites[role] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_messages=True)
         
         # Create channel
-        channel_name = f"apply-{interaction.user.name}"
+        channel_name = f"apply-{interaction.user.name}"[:100]  # Ensure channel name doesn't exceed limit
         category = discord.utils.get(interaction.guild.categories, name="Applications")
-        channel = await interaction.guild.create_text_channel(
-            name=channel_name,
-            overwrites=overwrites,
-            category=category,
-            topic=f"Application ticket for {interaction.user}"
-        )
+        
+        try:
+            channel = await interaction.guild.create_text_channel(
+                name=channel_name,
+                overwrites=overwrites,
+                category=category,
+                topic=f"Application ticket for {interaction.user}"
+            )
+        except discord.HTTPException as e:
+            await interaction.response.send_message("Failed to create application channel. Please try again later.", ephemeral=True)
+            return
         
         # Send application instructions
         embed = discord.Embed(
@@ -204,6 +209,21 @@ async def close(ctx):
     else:
         await ctx.send("This command can only be used in application channels.")
 
+# Error handling
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.MissingAnyRole):
+        await ctx.send("You don't have permission to use this command.")
+    elif isinstance(error, commands.CommandNotFound):
+        pass  # Ignore unknown commands
+    else:
+        print(f"An error occurred: {error}")
+
 # Run the bot
-keep_alive()
-bot.run(os.environ['BOT_TOKEN'])
+if __name__ == "__main__":
+    # Check if we're in a build environment (no BOT_TOKEN)
+    if not os.getenv("BOT_TOKEN"):
+        print("Build environment detected - skipping bot execution")
+    else:
+        keep_alive()
+        bot.run(os.environ['BOT_TOKEN'])
